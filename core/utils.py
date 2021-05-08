@@ -1,3 +1,4 @@
+from _typeshed import NoneType
 import asyncio
 import datetime
 import inspect
@@ -12,6 +13,7 @@ from sanic import response
 from sanic.exceptions import abort
 
 RE_MONGODB = re.compile("MONGO_URI_(.*)")
+GUILD_EXCEPTION = Exception("Guild Not added to this logger")
 
 class DB:
     def __init__(self):
@@ -28,8 +30,10 @@ class DB:
             self.dbs_conns[gid] = AsyncIOMotorClient(connURI).modmail_bot
 
     def getdb(self, gid):
-        return self.dbs_conns.get(gid)
-
+        try:
+            return self.dbs_conns.get(gid)
+        except AttributeError:
+            raise GUILD_EXCEPTION
 
 class User:
     def __init__(self, data):
@@ -112,9 +116,14 @@ def authrequired():
         @wraps(func)
         async def wrapper(request, gid, key):
             app = request.app
+
+            try:
+                db = app.db.getdb(int(gid))
+            except GUILD_EXCEPTION:
+                abort(404, message="Guild Not added to this viewer",)
             
             if not app.using_oauth:
-                return await func(request, await app.db.getdb(int(gid)).logs.find_one({"key": key}))
+                return await func(request, await db.logs.find_one({"key": key}))
             elif not request["session"].get("logged_in"):
                 request["session"]["from"] = request.url
                 return response.redirect("/login")
@@ -122,8 +131,8 @@ def authrequired():
             user = request["session"]["user"]
 
             config, document = await asyncio.gather(
-                app.db.getdb(int(gid)).config.find_one({"bot_id": int(app.bot_id)}),
-                app.db.getdb(int(gid)).logs.find_one({"key": key}),
+                db.config.find_one({"bot_id": int(app.bot_id)}),
+                db.logs.find_one({"key": key}),
             )
 
             whitelist = config.get("oauth_whitelist", [])
