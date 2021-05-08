@@ -112,5 +112,42 @@ def authrequired():
         @wraps(func)
         async def wrapper(request, gid, key):
             return await func(request, await request.app.db.getdb(int(gid)).logs.find_one({"key": key}))
+            app = request.app
+            
+            if not app.using_oauth:
+                return await func(request, await app.db.getdb(int(gid)).logs.find_one({"key": key}))
+            elif not request["session"].get("logged_in"):
+                request["session"]["from"] = request.url
+                return response.redirect("/login")
+
+            user = request["session"]["user"]
+
+            config, document = await asyncio.gather(
+                app.db.getdb(int(gid)).config.find_one({"bot_id": int(app.bot_id)}),
+                app.db.getdb(int(gid)).logs.find_one({"key": key}),
+            )
+
+            whitelist = config.get("oauth_whitelist", [])
+            if document:
+                if str(app.bot_id) != document.get("bot_id"):
+                    abort(
+                        401,
+                        message="Your account does not have permission to view this page.",
+                    )
+                whitelist.extend(document.get("oauth_whitelist", []))
+
+            if int(user["id"]) in whitelist or "everyone" in whitelist:
+                return await func(request, document)
+
+            roles = await app.get_user_roles(user["id"])
+
+            if any(int(r) in whitelist for r in roles):
+                return await func(request, document)
+
+            abort(
+                401, message="Your account does not have permission to view this page."
+            )
+
         return wrapper
+
     return decorator
