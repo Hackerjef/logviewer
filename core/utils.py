@@ -12,7 +12,6 @@ from sanic import response
 from sanic.exceptions import abort
 
 RE_MONGODB = re.compile("MONGO_URI_(.*)")
-GUILD_EXCEPTION = Exception("Guild Not added to this logger")
 
 class DB:
     def __init__(self):
@@ -27,12 +26,6 @@ class DB:
 
         for (gid, connURI) in self.dbs.items():
             self.dbs_conns[gid] = AsyncIOMotorClient(connURI).modmail_bot
-
-    def getdb(self, gid):
-        try:
-            return self.dbs_conns.get(gid)
-        except AttributeError:
-            raise GUILD_EXCEPTION
 
 class User:
     def __init__(self, data):
@@ -116,9 +109,8 @@ def authrequired():
         async def wrapper(request, gid, key):
             app = request.app
 
-            try:
-                db = app.db.getdb(int(gid))
-            except GUILD_EXCEPTION:
+            db = app.db.dbs_conns.get(int(gid))
+            if not db:
                 abort(404, message="Guild Not added to this viewer",)
             
             if not app.using_oauth:

@@ -28,8 +28,8 @@ def render_template(name, *args, **kwargs):
     request = get_stack_variable("request")
     if request:
         kwargs["request"] = request
-        kwargs["session"] = request["session"]
-        kwargs["user"] = request["session"].get("user")
+        kwargs["session"] = request.get("session", dict())
+        kwargs["user"] = kwargs["session"].get("user", "")
     kwargs.update(globals())
     return response.html(template.render(*args, **kwargs))
 
