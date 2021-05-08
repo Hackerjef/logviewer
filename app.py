@@ -1,8 +1,8 @@
 import os
 from functools import wraps
 from urllib.parse import urlencode, urlparse
+from dotenv import load_dotenv
 
-from motor.motor_asyncio import AsyncIOMotorClient
 from sanic import Sanic, response
 from sanic.exceptions import abort, NotFound, Unauthorized
 from sanic_session import Session, InMemorySessionInterface
@@ -11,11 +11,9 @@ from jinja2 import Environment, PackageLoader
 import aiohttp
 
 from core.models import LogEntry
-from core.utils import get_stack_variable, authrequired, User
+from core.utils import get_stack_variable, authrequired, DB
 
-prefix = os.getenv("URL_PREFIX", "/logs")
-if prefix == "NONE":
-    prefix = ""
+load_dotenv()
 
 app = Sanic(__name__)
 app.using_oauth = False
@@ -38,11 +36,11 @@ def render_template(name, *args, **kwargs):
 
 app.render_template = render_template
 
-
 @app.listener("before_server_start")
 async def init(app, loop):
-    app.db = AsyncIOMotorClient(os.getenv("MONGO_URI")).modmail_bot
+    app.db = DB()
     app.session = aiohttp.ClientSession(loop=loop)
+    
 
 @app.exception(NotFound)
 async def not_found(request, exc):
@@ -52,7 +50,7 @@ async def not_found(request, exc):
 async def index(request):
     return render_template("index")
 
-@app.get(prefix + "/raw/<key>")
+@app.get("/<gid>/raw/<key>")
 @authrequired()
 async def get_raw_logs_file(request, document):
     """Returns the plain text rendered log entry"""
@@ -65,7 +63,7 @@ async def get_raw_logs_file(request, document):
     return log_entry.render_plain_text()
 
 
-@app.get(prefix + "/<key>")
+@app.get("/<gid>/<key>")
 @authrequired()
 async def get_logs_file(request, document):
     """Returns the html rendered log entry"""
@@ -80,7 +78,7 @@ async def get_logs_file(request, document):
 
 if __name__ == "__main__":
     app.run(
-        host=os.getenv("HOST", "0.0.0.0"),
+        host=os.getenv("HOST", "127.0.0.1"),
         port=os.getenv("PORT", 8000),
         debug=bool(os.getenv("DEBUG", False)),
     )

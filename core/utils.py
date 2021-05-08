@@ -1,11 +1,34 @@
-from functools import wraps
-from sanic.exceptions import abort
-from sanic import response
-import inspect
+import asyncio
 import datetime
+import inspect
+import re
+from functools import wraps
+
 from discord.enums import DefaultAvatar
 from discord.utils import snowflake_time
-import asyncio
+from dotenv import dotenv_values
+from motor.motor_asyncio import AsyncIOMotorClient
+from sanic import response
+from sanic.exceptions import abort
+
+RE_MONGODB = re.compile("MONGO_URI_(.*)")
+
+class DB:
+    def __init__(self):
+        self.envfile = dotenv_values(".env")
+        self.dbs = dict()
+        self.dbs_conns = dict()
+
+        for (key, value) in self.envfile.items():
+            match = re.match(RE_MONGODB, key)
+            if match:
+                self.dbs[int(match.groups()[0])] = value
+
+        for (gid, connURI) in self.dbs.items():
+            self.dbs_conns[gid] = AsyncIOMotorClient(connURI).modmail_bot
+
+    def getdb(self, gid):
+        return self.dbs_conns.get(gid)
 
 
 class User:
@@ -87,43 +110,7 @@ def get_stack_variable(name):
 def authrequired():
     def decorator(func):
         @wraps(func)
-        async def wrapper(request, key):
-            app = request.app
-
-            if not app.using_oauth:
-                return await func(request, await app.db.logs.find_one({"key": key}))
-            elif not request["session"].get("logged_in"):
-                request["session"]["from"] = request.url
-                return response.redirect("/login")
-
-            user = request["session"]["user"]
-
-            config, document = await asyncio.gather(
-                app.db.config.find_one({"bot_id": int(app.bot_id)}),
-                app.db.logs.find_one({"key": key}),
-            )
-
-            whitelist = config.get("oauth_whitelist", [])
-            if document:
-                if str(app.bot_id) != document.get("bot_id"):
-                    abort(
-                        401,
-                        message="Your account does not have permission to view this page.",
-                    )
-                whitelist.extend(document.get("oauth_whitelist", []))
-
-            if int(user["id"]) in whitelist or "everyone" in whitelist:
-                return await func(request, document)
-
-            roles = await app.get_user_roles(user["id"])
-
-            if any(int(r) in whitelist for r in roles):
-                return await func(request, document)
-
-            abort(
-                401, message="Your account does not have permission to view this page."
-            )
-
+        async def wrapper(request, gid, key):
+            return await func(request, await request.app.db.getdb(int(gid)).logs.find_one({"key": key}))
         return wrapper
-
     return decorator
