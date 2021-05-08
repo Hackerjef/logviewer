@@ -111,7 +111,6 @@ def authrequired():
     def decorator(func):
         @wraps(func)
         async def wrapper(request, gid, key):
-            return await func(request, await request.app.db.getdb(int(gid)).logs.find_one({"key": key}))
             app = request.app
             
             if not app.using_oauth:
