@@ -108,10 +108,9 @@ def authrequired():
         @wraps(func)
         async def wrapper(request, gid, key):
             app = request.app
-
+            if gid not in app.db.dbs_conns:
+                abort(404, message="Guild Not added to this viewer", )
             db = app.db.dbs_conns.get(int(gid))
-            if not db:
-                abort(404, message="Guild Not added to this viewer",)
             
             if not app.using_oauth:
                 return await func(request, await db.logs.find_one({"key": key}))
