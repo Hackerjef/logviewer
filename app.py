@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from sanic import Sanic, response
 from sanic.exceptions import abort, NotFound, Unauthorized
 from sanic_session import Session, InMemorySessionInterface
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import aiohttp
 
@@ -21,7 +21,10 @@ app.using_oauth = False
 Session(app, interface=InMemorySessionInterface())
 app.static("/static", "./static")
 
-jinja_env = Environment(loader=PackageLoader("app", "templates"))
+jinja_env = Environment(
+    loader=FileSystemLoader('templates'),
+    autoescape=select_autoescape(['html']),
+)
 
 def render_template(name, *args, **kwargs):
     template = jinja_env.get_template(name + ".html")
