@@ -1,62 +1,51 @@
+__version__ = "1.1"
+
 import os
-from functools import wraps
-from urllib.parse import urlencode, urlparse
 from dotenv import load_dotenv
 
 from sanic import Sanic, response
-from sanic.exceptions import abort, NotFound, Unauthorized
-from sanic_session import Session, InMemorySessionInterface
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
-import aiohttp
+from sanic.exceptions import abort, NotFound
+from jinja2 import Environment, FileSystemLoader
 
 from core.models import LogEntry
-from core.utils import get_stack_variable, authrequired, DB
+from core.utils import DB, with_document
 
 load_dotenv()
 
 app = Sanic(__name__)
-app.using_oauth = False
-
-Session(app, interface=InMemorySessionInterface())
 app.static("/static", "./static")
 
-jinja_env = Environment(
-    loader=FileSystemLoader('templates'),
-    autoescape=select_autoescape(['html']),
-)
+jinja_env = Environment(loader=FileSystemLoader("templates"))
+
 
 def render_template(name, *args, **kwargs):
     template = jinja_env.get_template(name + ".html")
-    request = get_stack_variable("request")
-    if request:
-        kwargs["request"] = request
-        kwargs["session"] = request.get("session", dict())
-        kwargs["user"] = kwargs["session"].get("user", "")
-    kwargs.update(globals())
     return response.html(template.render(*args, **kwargs))
 
 
-app.render_template = render_template
+app.ctx.render_template = render_template
+
 
 @app.listener("before_server_start")
 async def init(app, loop):
-    app.db = DB()
-    app.session = aiohttp.ClientSession(loop=loop)
-    
+    app.ctx.dbs = DB()
+
 
 @app.exception(NotFound)
 async def not_found(request, exc):
     return render_template("not_found")
 
+
 @app.get("/")
 async def index(request):
     return render_template("index")
 
+
 @app.get("/<gid>/raw/<key>")
-@authrequired()
+@with_document()
 async def get_raw_logs_file(request, document):
     """Returns the plain text rendered log entry"""
+
 
     if document is None:
         abort(404)
@@ -67,7 +56,7 @@ async def get_raw_logs_file(request, document):
 
 
 @app.get("/<gid>/<key>")
-@authrequired()
+@with_document()
 async def get_logs_file(request, document):
     """Returns the html rendered log entry"""
 

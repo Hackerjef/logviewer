@@ -1,7 +1,16 @@
-FROM library/python:3.8.10
-RUN apt update && apt install -y pipenv
-COPY . /logviewer
+FROM python:3.9-slim as py
+
+FROM py as build
+
+RUN apt update && apt install -y g++
+COPY requirements.txt /
+RUN pip install --prefix=/inst -U -r /requirements.txt
+
+FROM py
+
+ENV USING_DOCKER yes
+COPY --from=build /inst /usr/local
+
 WORKDIR /logviewer
-RUN pipenv install
-EXPOSE 8000
-CMD ["pipenv", "run", "python3", "app.py"]
+CMD ["python", "app.py"]
+COPY . /logviewer
