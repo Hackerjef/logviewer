@@ -22,6 +22,10 @@ class DB:
         for (gid, connURI) in self.dbs.items():
             self.dbs_conns[gid] = AsyncIOMotorClient(connURI).modmail_bot
 
+    def get(self, gid):
+        db = self.dbs_conns.get(int(gid), None)
+        return db
+
 
 def with_document():
     def decorator(func):
@@ -30,7 +34,7 @@ def with_document():
             app = request.app
             if not str(gid).isdigit():
                 abort(404, message="Not a guild ID", )
-            db = app.ctx.dbs.dbs_conns.get(int(gid))
+            db = app.ctx.dbs.get(int(gid))
             if not db:
                 abort(404, message="Guild Not added to this viewer", )
 
