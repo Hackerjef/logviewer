@@ -1,6 +1,6 @@
 import re
 from functools import wraps
-from sanic.exceptions import abort
+from sanic import exceptions
 
 from dotenv import dotenv_values
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -33,10 +33,10 @@ def with_document():
         async def wrapper(request, gid, key):
             app = request.app
             if not str(gid).isdigit():
-                abort(404, message="Not a guild ID", )
+                raise exceptions.InvalidUsage()
             db = app.ctx.dbs.get(int(gid))
             if not db:
-                abort(404, message="Guild Not added to this viewer", )
+                raise exceptions.NotFound()
 
             document = await db.logs.find_one({"key": key})
 

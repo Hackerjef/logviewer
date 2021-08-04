@@ -11,8 +11,10 @@ motor = "~=2.4.0"
 natural = "~=0.2.0"
 pymongo = {version = "*", extras = ['srv']}  # Required by motor
 python-dateutil = "~=2.8.1"
-sanic = "~=21.6.0"
+sanic = "*"
 python-dotenv = "*"
+sanic-oauth = {editable = true, git = "https://gitlab.com/Hackerjef/sanic-oauth.git"}
+sanic-session = "*"
 
 [scripts]
 logviewer = "python app.py"
